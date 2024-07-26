@@ -18,13 +18,37 @@ func getFilePaths(rootDir string) ([]string, error) {
 	// Walk through the directory tree
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// If the file doesn't exist or there is a permission error, skip the file
+			if os.IsNotExist(err) || os.IsPermission(err) {
+				// fmt.Printf("Skipping path %v: %v\n", path, err) << Uncomment if desire is to see what is being skipped
+				return nil
+			}
+			// For other errors, print and continue
+			fmt.Printf("Error accessing the path %v: %v\n", path, err)
+			return nil
 		}
 
-		if !info.IsDir() {
+		if info.IsDir() {
 			// Print each file or directory's path
-			paths = append(paths, path)
+			return nil
 		}
+
+		if info.Mode()&os.ModeSocket != 0 {
+			// fmt.Printf("Skipping socket: %v\n", path) << Uncomment if desire is to see what is being skipped
+			return nil
+		}
+
+		if info.Mode()&os.ModeNamedPipe != 0 {
+			// fmt.Printf("Skipping named pipe: %v\n", path) << Uncomment if desire is to see what is being skipped
+			return nil
+		}
+
+		if info.Mode()&os.ModeDevice != 0 {
+			// fmt.Printf("Skipping device file: %v\n", path) << Uncomment if desire is to see what is being skipped
+			return nil
+		}
+
+		paths = append(paths, path)
 		return nil
 
 	})
@@ -40,22 +64,47 @@ func getHashValues(rootDir string, pathList []string) (BaselineFileList, error) 
 	var hashMap []File
 
 	for _, path := range pathList {
+		// Check if the path is a directory
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// Log files that raise a "do not exist" error
+				// fmt.Printf("File %v does not exist, skipping...\n", path) << Uncomment if desire is to see what is being skipped
+				continue
+			}
+			// Log other errors
+			fmt.Printf("Error accessing file %v: %v\n", path, err)
+			continue
+		}
+
+		// Ocassionally a directory will still make it through the last function, so this will check again.
+		if info.IsDir() {
+			// fmt.Printf("Path %v is a directory, skipping...\n", path) << Uncomment if desire is to see what is being skipped
+			continue
+		}
+
+		// Process the file
 		hasher := sha256.New()
 		file, err := os.Open(path)
 		if err != nil {
-			return BaselineFileList{}, err
+			fmt.Printf("Error opening file %v: %v\n", path, err)
+			continue
 		}
 		defer file.Close()
 
 		if _, err := io.Copy(hasher, file); err != nil {
-			return BaselineFileList{}, err
+			fmt.Printf("Error reading file %v: %v\n", path, err)
+			continue
 		}
 
 		fileHash := hex.EncodeToString(hasher.Sum(nil))
-
+		// Append file struct to the slice of File struct
 		hashMap = append(hashMap, File{Path: path, Hash: fileHash})
 	}
 
+	fmt.Println("[+] Finished processing files...")
+
+	// Create BaselineFileList struct and return it
 	baselineFileList := BaselineFileList{
 		BaselinePath: rootDir,
 		Files:        hashMap,
@@ -89,7 +138,7 @@ func generateBaselineFunc(definingFilename string, jsonData []byte) (string, err
 		return "", fmt.Errorf("error writing json to file: %v", err)
 	}
 
-	return fmt.Sprintln("Successfully generated baseline file"), nil
+	return fmt.Sprintln("[+] Successfully generated baseline file"), nil
 }
 
 // Takes a baseline file, and marshals it to a BaselineFileList struct to then compare with a new scan.
@@ -180,7 +229,8 @@ func compareBaselineFunc(baseLine BaselineFileList) (Difference, error) {
 
 // Use function to format and print Difference
 func printDifferences(dif Difference) {
-	fmt.Println("~~~Hash Differences~~~")
+	fmt.Println("[+] Results:")
+	fmt.Println("\n~~~Hash Differences~~~")
 	if dif.HashDifferences == nil {
 		fmt.Println("No hash differences found")
 	}
