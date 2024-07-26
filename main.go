@@ -28,13 +28,13 @@ func main() {
 		log.Fatal("error getting file paths:", err)
 	}
 
-	// Generate baseline files struct to be written to json when creating baseline
+	// Generate baseline files struct. This will be written to json when creating baseline
 	filesHashed, err := getHashValues(*rootDir, filepaths)
 	if err != nil {
 		log.Fatal("error generating a hash map")
 	}
 
-	// Write to a json
+	// Write baseline struct to json format. This can then be written to a .json file
 	jsonData, err := writeToJson(filesHashed)
 	if err != nil {
 		log.Fatal("error writing struct to json:", err)
