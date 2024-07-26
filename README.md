@@ -3,7 +3,7 @@ A lightweight file integrity monitoring application written in Go.
 
 # Flags
 - **-dir \<*target path*\>:** Specify the directory you want to scan to build a baseline on
-- **-baseline \<*outfile name*\>:** Specify the name of the baseline file. *_baseline\<current date\>* will be apended to the file name.
+- **-baseline \<*outfile name*\>:** Specify the name of the baseline file. *_baseline\<current date\>* will be appended to the file name.
 - **-compare \<*baseline file name*\>:** Specify the baseline file you want to compare against.
 
 # How-To/Workflow
